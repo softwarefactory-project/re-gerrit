@@ -1,0 +1,28 @@
+{
+  "name": "@softwarefactory-project/re-gerrit",
+  "version": "0.2.1",
+  "description": "ANSI code to HTML",
+  "files": [
+    "README.md",
+    "LICENSE",
+    "bsconfig.json",
+    "src/*.re",
+    "dist/ZuulResultPlugin.bs.js"
+  ],
+  "license": "Apache-2.0",
+  "homepage": "https://github.com/softwarefactory-project/re-gerrit",
+  "repository": {
+    "type": "git",
+    "url": "git+https://softwarefactory-project.io/r/software-factory/re-gerrit.git"
+  },
+  "scripts": {
+    "build": "bsb -make-world",
+    "start": "bsb -make-world -w",
+    "test": "bsb -make-world && node tests/Spec.bs.js"
+  },
+  "keywords": ["gerrit", "rescript", "bucklescript"],
+  "dependencies": {},
+  "devDependencies": {
+    "bs-platform": "^8.2.0"
+  }
+}
