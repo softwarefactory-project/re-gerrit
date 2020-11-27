@@ -9,7 +9,7 @@ let commentMessage =
     message: "LGTM",
   };
 
-let fakeMessage =
+let ciMessage =
   Change.{
     id: "test",
     date: "2020-11-24",
@@ -25,32 +25,35 @@ Build succeeded (check pipeline).
 ",
   };
 
+let ciResult =
+  CI.Result.{
+    name: "Zuul CI",
+    pipeline: "check",
+    date: "2020-11-24"->Js.Date.fromString,
+    builds: [|
+      {
+        job: "zuul-build-image",
+        url: "http://logs/f7490be/",
+        time: "29m 22s (non-voting)",
+        result: "SUCCESS",
+      },
+    |],
+  };
+
 let fakeChange = {
   Change.{
     project: "demo",
     branch: "main",
     topic: None,
     status: "NEW",
-    messages: [|commentMessage, fakeMessage, fakeMessage|],
+    messages: [|commentMessage, ciMessage, ciMessage|],
   };
 };
 
 let spec: list(bool) = [
-  fakeMessage->CI.Zuul.fromMessage
-  == CI.Result.{
-       name: "Zuul CI",
-       pipeline: "check",
-       date: "2020-11-24"->Js.Date.fromString,
-       builds: [|
-         {
-           job: "zuul-build-image",
-           url: "http://logs/f7490be/",
-           time: "29m 22s (non-voting)",
-           result: "SUCCESS",
-         },
-       |],
-     }
-     ->Some,
+  ciMessage->CI.Zuul.fromMessage == ciResult->Some,
+  fakeChange->CI.Results.fromChange
+  == [|CI.Results.{count: 2, latests: ciResult}|],
 ];
 
 Node.Process.exit(spec->Belt.List.every(x => x) ? 0 : 1);

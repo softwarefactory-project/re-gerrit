@@ -38,7 +38,7 @@ module Result = {
 
 module Zuul = {
   // Regular expression to match zuul result comments
-  let authorRe = [%re "/^(Zuul.*)/i"];
+  let authorRe = [%re "/^(.* CI|Zuul)/"];
   let headerRe = [%re "/^Build \\w+ \\(([-\\w]+) pipeline\\)/"];
   let resultRe = [%re "/^- ([^ ]+) ([^ ]+) : ([^ ]+) in (.*)/"];
 
