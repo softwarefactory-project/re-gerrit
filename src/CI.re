@@ -38,7 +38,7 @@ module Result = {
 
 module Zuul = {
   // Regular expression to match zuul result comments
-  let authorRe = [%re "/^(Zuul.*)/i"];
+  let authorRe = [%re "/^(.* CI|Zuul)/"];
   let headerRe = [%re "/^Build \\w+ \\(([-\\w]+) pipeline\\)/"];
   let resultRe = [%re "/^- ([^ ]+) ([^ ]+) : ([^ ]+) in (.*)/"];
 
@@ -107,12 +107,13 @@ module Results = {
         replaced ? acc : acc->Belt.List.add({count: 1, latests: current})
       | [x, ...xs] =>
         // if previous result exists, replace and increase the recheck count
-        x.latests.pipeline == current.pipeline
+        x.latests.name == current.name
+        && x.latests.pipeline == current.pipeline
           ? xs->go(
               true,
               acc->Belt.List.add({count: x.count + 1, latests: current}),
             )
-          : xs->go(false, acc)
+          : xs->go(false, acc->Belt.List.add(x))
       };
     history->go(false, []);
   };
