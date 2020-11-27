@@ -1,6 +1,6 @@
 {
   "name": "@softwarefactory-project/re-gerrit",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Gerrit client",
   "files": ["README.md", "LICENSE", "bsconfig.json", "src/*.re"],
   "license": "Apache-2.0",

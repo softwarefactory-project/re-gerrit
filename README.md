@@ -45,6 +45,10 @@ Make sure to read about [Reason][rescript-lang] too.
 
 ## Changes
 
+### 0.1.1
+
+- Support jenkins CI message
+
 ### 0.1.0
 
 - Initial release
