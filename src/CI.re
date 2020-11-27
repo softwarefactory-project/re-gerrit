@@ -13,12 +13,13 @@
 // under the License.
 
 // CI result
+open Belt;
 
-module Result = {
+module CIResult = {
   // A single CI result
   type t = {
     name: string,
-    pipeline: string,
+    pipeline: option(string),
     date: Js.Date.t,
     builds: array(build),
   }
@@ -34,12 +35,9 @@ module Result = {
     | "SKIPPED" => None
     | _ => "red"->Some
     };
-};
 
-module Zuul = {
-  // Regular expression to match zuul result comments
-  let authorRe = [%re "/^(Zuul.*)/i"];
-  let headerRe = [%re "/^Build \\w+ \\(([-\\w]+) pipeline\\)/"];
+  // Regular expression to match CI result comments
+  let authorRe = [%re "/^(.* CI|Zuul)/"];
   let resultRe = [%re "/^- ([^ ]+) ([^ ]+) : ([^ ]+) in (.*)/"];
 
   // Helper functions
@@ -47,19 +45,19 @@ module Zuul = {
   let firstMatch = (re: Js.Re.t, txt: string): option(string) =>
     re
     ->Js.Re.exec_(txt)
-    ->Belt.Option.flatMap(res =>
-        Js.Nullable.toOption(Js.Re.captures(res)[1])
-      );
+    ->Option.flatMap(res => Js.Re.captures(res)[1])
+    ->Option.flatMap(nullOpt);
+
   // Extract build info from a message line
-  let buildFromMessage = (line: string): option(Result.build) => {
+  let buildFromMessage = (line: string): option(build) => {
     resultRe
     ->Js.Re.exec_(line)
-    ->Belt.Option.flatMap(res =>
+    ->Option.flatMap(res =>
         switch (res->Js.Re.captures) {
         | [|_, job, url, result, time|] =>
           switch (job->nullOpt, url->nullOpt, result->nullOpt, time->nullOpt) {
           | (Some(job), Some(url), Some(result), Some(time)) =>
-            Result.{job, url, result, time}->Some
+            {job, url, result, time}->Some
           | _ => None
           }
         | _ => None
@@ -67,22 +65,22 @@ module Zuul = {
       );
   };
   // Extract zuul build report from a message
-  let fromMessage = (message: Gerrit.Change.message): option(Result.t) => {
+  let fromMessage =
+      (pipelineMatch, message: Gerrit.Change.message): option(t) => {
     let lines =
       Js.Array.sliceFrom(2, "\n"->Js.String.split(message.message));
     let content = Js.Array.joinWith("\n", lines);
     authorRe
     ->firstMatch(message.author.name)
-    ->Belt.Option.flatMap(name => {
-        headerRe
-        ->firstMatch(content)
-        ->Belt.Option.flatMap(pipeline =>
-            Result.{
+    ->Option.flatMap(name => {
+        pipelineMatch(content)
+        ->Option.flatMap(pipeline =>
+            {
               name,
               pipeline,
               builds:
                 Js.Array.sliceFrom(2, lines)
-                ->Belt.Array.keepMap(buildFromMessage),
+                ->Array.keepMap(buildFromMessage),
               date: message.date->Js.Date.fromString,
             }
             ->Some
@@ -91,38 +89,61 @@ module Zuul = {
   };
 };
 
+module Zuul = {
+  // Regular expression to match zuul result comments
+  let headerRe = [%re "/^Build \\w+ \\(([-\\w]+) pipeline\\)\\./"];
+  let fromMessage =
+    CIResult.fromMessage(content =>
+      headerRe
+      ->CIResult.firstMatch(content)
+      ->Option.flatMap(v => v->Some->Some)
+    );
+};
+
+module Jenkins = {
+  // Regular expression to match zuul result comments
+  let headerRe = [%re "/^Build \\w+\\./"];
+  //  let headerRe = [%re "/^Build \\w+\\.$/"];
+  let fromMessage =
+    CIResult.fromMessage(content =>
+      headerRe->Js.Re.exec_(content)->Option.flatMap(_ => None->Some)
+    );
+};
+
 module Results = {
   // A list of results with recheck count
   type t = {
     count: int,
-    latests: Result.t,
+    latests: CIResult.t,
   };
 
   // Get latest patchset CI results
-  let addResult = (history: list(t), current: Result.t): list(t) => {
+  let addResult = (history: list(t), current: CIResult.t): list(t) => {
     let rec go = (xs, replaced: bool, acc: list(t)) =>
       switch (xs) {
       | [] =>
         // if result was not replaced, add it to the accumulator
-        replaced ? acc : acc->Belt.List.add({count: 1, latests: current})
+        replaced ? acc : acc->List.add({count: 1, latests: current})
       | [x, ...xs] =>
         // if previous result exists, replace and increase the recheck count
-        x.latests.pipeline == current.pipeline
+        x.latests.name == current.name
+        && x.latests.pipeline == current.pipeline
           ? xs->go(
               true,
-              acc->Belt.List.add({count: x.count + 1, latests: current}),
+              acc->List.add({count: x.count + 1, latests: current}),
             )
-          : xs->go(false, acc)
+          : xs->go(replaced, acc->List.add(x))
       };
-    history->go(false, []);
+    history->go(false, [])->List.reverse;
   };
   let fromMessages = (messages: array(Gerrit.Change.message)): array(t) => {
     let rec go = (xs, ps, acc) => {
       switch (xs) {
-      | [] => acc->Belt.List.toArray
+      | [] => acc->List.toArray
       | [x, ...xs] =>
-        switch (x->Zuul.fromMessage) {
-        | Some(result) =>
+        switch (x->Zuul.fromMessage, x->Jenkins.fromMessage) {
+        | (Some(result), _)
+        | (_, Some(result)) =>
           // drop history if current patchset is more recent
           let history = x._revision_number == ps ? acc : [];
           xs->go(x._revision_number, history->addResult(result));
@@ -130,7 +151,7 @@ module Results = {
         }
       };
     };
-    messages->Belt.List.fromArray->go(1, []);
+    messages->List.fromArray->go(1, []);
   };
   let fromChange = (change: Gerrit.Change.t): array(t) =>
     change.messages->fromMessages;
