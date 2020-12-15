@@ -64,8 +64,7 @@ let buildFromMessage = (line: string): option(build) => {
     );
 };
 // Extract zuul build report from a message
-let fromMessage =
-    (pipelineMatch, message: Gerrit.Change.message): option(result) => {
+let fromMessage = (pipelineMatch, message: Change.message): option(result) => {
   let lines = Js.Array.sliceFrom(2, "\n"->Js.String.split(message.message));
   let content = Js.Array.joinWith("\n", lines);
   authorRe
@@ -129,7 +128,7 @@ module Results = {
       };
     history->go(false, [])->List.reverse;
   };
-  let fromMessages = (messages: array(Gerrit.Change.message)): array(t) => {
+  let fromMessages = (messages: array(Change.message)): array(t) => {
     let rec go = (xs, ps, acc) => {
       switch (xs) {
       | [] => acc->List.toArray
@@ -146,6 +145,6 @@ module Results = {
     };
     messages->List.fromArray->go(1, []);
   };
-  let fromChange = (change: Gerrit.Change.t): array(t) =>
+  let fromChange = (change: Change.t): array(t) =>
     change.messages->fromMessages;
 };
